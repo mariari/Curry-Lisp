@@ -62,7 +62,7 @@
   "Creates a partially applied function that takes 1 argument"
   (if (functionp (macro-function fn))
       `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
-      `(curryf (gensymbol-list (- ,num 1) #'curryf) #',fn ,@args)))
+      `(curry ,@(gensymbol-list (- num 1) 'curryf) #',fn ,@args)))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
