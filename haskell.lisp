@@ -57,9 +57,12 @@
   "Creates a partially applied function that takes many argument"
   (lambda (&rest args2) (apply fn (append args args2))))
 
+;; Error with (let ((y 2)) (currys y + 1 2 3)) because of how the environment is processed
 (defmacro currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  `(curry ,@(gensymbol-list (- num 1) 'curry) ,fn ,@args))
+  (if (functionp (macro-function fn))
+      `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
+      `(curryf (gensymbol-list (- ,num 1) #'curryf) #',fn ,@args)))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
@@ -130,9 +133,9 @@
   "The monoid for Strings "
   `(concatenate 'string ,@str))
 
-(defun <>! (&rest lis)
-  "The monoid for lists"
-  (apply #'append l is))
+;; (defun <>! (&rest lis)
+;;   "The monoid for lists"
+;;   (apply #'append l is))
 
 (defmacro <>!! (&body vec)
   "The monoid for Vectors "
