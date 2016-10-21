@@ -10,7 +10,7 @@
   (:documentation "Abstractions Inspired from Haskell")
   (:use #:let-over-lambda)
   (:shadowing-import-from #:let-over-lambda #:when-match #:if-match)
-  (:use #:sb-ext
+  (:use #:swank
         #:macros
         #:common-lisp
         #:trivia)
@@ -21,6 +21,7 @@
            :<>  :<>!  :<>!!
            :>>= :>>=! :=<< :=<<!))
 
+(in-package :haskell-lisp)
 ;;; Miscellaneous Haskell Commands-------------------------------------------------------------
 (defun join (lis)
   "((1) (2)) --> (1 2) removes 1 layer of a list"
@@ -57,12 +58,18 @@
   "Creates a partially applied function that takes many argument"
   (lambda (&rest args2) (apply fn (append args args2))))
 
-;; Error with (let ((y 2)) (currys y + 1 2 3)) because of how the environment is processed
-(defmacro currys (num fn . args)
+;; can now take variables as input!!
+(defmacro! currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  (if (functionp (macro-function fn))
-      `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
-      `(curry ,@(gensymbol-list (- num 1) 'curryf) #',fn ,@args)))
+  (if (integerp num)
+      (if (functionp (macro-function fn))
+          `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
+          `(curry ,@(gensymbol-list (- num 1) 'curryf) #',fn ,@args))
+      `(nlet-tail ,g!name
+           ((,g!count (1-  ,num))
+            (,g!acc (curry ,fn ,@args)))
+         (gensymbol-list ,g!count 'curryf)
+         (apply #'curryf (append (gensymbol-list ,g!count #'curryf) (list  ,g!acc))))))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
