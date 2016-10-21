@@ -11,7 +11,6 @@
   (:use #:let-over-lambda)
   (:shadowing-import-from #:let-over-lambda #:when-match #:if-match)
   (:use #:swank
-        #:macros
         #:common-lisp
         #:trivia)
   (:export :join :flip
@@ -37,8 +36,6 @@
          (flip-fn-list ,fn ,x ,y ,rest))
        (,fn ,y ,x . ,rest)))
 
-(macroexpand-1 '(CURRY <*> (+ 3) (/ 2)))
-
 (defmacro curry (fn . args)
   "Creates a partially applied function that takes 1 argument if it is a macro
    (a limitation of &rest closures in CL) and multiple if it is a function"
@@ -58,18 +55,14 @@
   "Creates a partially applied function that takes many argument"
   (lambda (&rest args2) (apply fn (append args args2))))
 
-;; can now take variables as input!!
+;; can now take variables as input!! (let ((y 2)) (currys 2 + 1 2 3))
 (defmacro! currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  (if (integerp num)
+  (if (integerp num)                    ; can't expand the environment optimally if a number isn't directly passed
       (if (functionp (macro-function fn))
           `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
           `(curryf ,@(gensymbol-list (- num 1) #'curryf) #',fn ,@args))
-      `(nlet-tail ,g!name
-           ((,g!count (1-  ,num))
-            (,g!acc (curry ,fn ,@args)))
-         (gensymbol-list ,g!count 'curryf)
-         (apply #'curryf (append (gensymbol-list ,g!count #'curryf) (list  ,g!acc))))))
+      `(apply #'curryf (append (gensymbol-list (1- ,num) #'curryf) (list  (curry ,fn ,@args))))))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
