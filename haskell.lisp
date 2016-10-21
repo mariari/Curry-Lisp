@@ -64,7 +64,7 @@
   (if (integerp num)
       (if (functionp (macro-function fn))
           `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
-          `(curry ,@(gensymbol-list (- num 1) 'curryf) #',fn ,@args))
+          `(curryf ,@(gensymbol-list (- num 1) #'curryf) #',fn ,@args))
       `(nlet-tail ,g!name
            ((,g!count (1-  ,num))
             (,g!acc (curry ,fn ,@args)))
