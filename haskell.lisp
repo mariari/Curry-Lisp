@@ -10,7 +10,7 @@
   (:documentation "Abstractions Inspired from Haskell")
   (:use #:let-over-lambda)
   (:shadowing-import-from #:let-over-lambda #:when-match #:if-match)
-  (:use #:swank
+  (:use #:swank-backend
         #:common-lisp
         #:trivia)
   (:export :join :flip
@@ -43,7 +43,6 @@
       `(currym ,fn ,@args)
       `(curryf #',fn ,@args)))
 
-(curry <*> (+ 1) (/ 2))
 ;; Maybe use macrolet to create our lexical closure or at least get the list so we can take multiple arguments
 (defmacro currym (fn . args)
   "Creates a partially applied function that takes 1 argument"
@@ -59,7 +58,7 @@
 ;; can now take variables as input!! (let ((y 2)) (currys 2 + 1 2 3))
 (defmacro currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  (if (integerp num) ; can't expand the environment optimally if a number isn't directly passed
+  (if (integerp num)                    ; can't expand the environment optimally if a number isn't directly passed
       (if (functionp (macro-function fn))
           `(currym ,@(gensymbol-list (1- num) 'currym) ,fn ,@args)
           `(curryf ,@(gensymbol-list (1- num) #'curryf) #',fn ,@args))
@@ -68,6 +67,7 @@
 
 (declaim (ftype (function ((integer 0) function &rest t) function) curryf-num))
 (defun curryf-num (num fn &rest args)
+  "contentiously curries a function until the num has been surpassed"
   (lambda (&rest args2)
     (let ((left (- num (length args2))))
       (declare (type Integer left))
@@ -76,6 +76,21 @@
                       (apply (curryf #'curryf fn)
                              (append args args2)))
           (apply fn (append args args2))))))
+
+;;  Will correctly display the right amount for &rest but not for &optional and &keyword yet
+;; arglist is also very slow (8k processor cycles!!!) so make sure to optimize this away by having it only expand in a macro!!
+(defun num-args (fn)
+  "Gets the number of args in a function"
+  (length (arglist fn)))
+
+(defun auto-curryf (fn &rest args)
+  (apply #'curryf-num (list* (num-args fn) fn args)))
+
+;; Can't take (let ((y +)) (auto-curry y)) but can do (auto-curry +) with 10k less processor cycles than auto-curryf
+(defmacro auto-curry (fn &rest args)
+  (if (null args)
+      `(curryf-num ,(num-args fn) #',fn)
+      `(curryf-num ,(num-args fn) #',fn ,args)))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
@@ -218,8 +233,3 @@
 ;; ([+ 1 2 3 :a 2] 2)
 ;; ([+ 1 2 3 :flip-apply 2] 2)
 ;; ([+ 1 2 3 :b 2] 2)
-
-;; If there is no better way to get the argument amounts per function, then
-
-
-;; (swank-backend:arglist #'+)
