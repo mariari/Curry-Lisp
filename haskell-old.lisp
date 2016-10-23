@@ -15,6 +15,19 @@
 (defmacro <>!% (&body lis)
   `(append ,@lis))
 
+(declaim (ftype (function (fixnum function &rest t) function) curryf-num%))
+(defun curryf-num% (num fn &optional &rest args)
+  (let ((left num))
+    (labels ((tco (fn &rest args2)
+               (if (= left num)
+                   (progn
+                     (setf left (- left (length args2)))
+                     (setf args2 (append args args2)))
+                   (setf left (- left (length args2))))
+               (if (> left 0)
+                   (curryf #'tco (apply (curryf #'curryf fn) args2))
+                   (apply fn args2))))
+      (curryf #'tco fn))))
 ;; Eval is evil for macros!!!!!!!!!!!!!!-------------------------------------------------------
 
 (defmacro flip% (fn x y . rest)

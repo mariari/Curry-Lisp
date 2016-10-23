@@ -41,8 +41,9 @@
    (a limitation of &rest closures in CL) and multiple if it is a function"
   (if (functionp (macro-function fn))
       `(currym ,fn ,@args)
-      `(curryf (symbol-function ',fn) ,@args)))
+      `(curryf #',fn ,@args)))
 
+(curry <*> (+ 1) (/ 2))
 ;; Maybe use macrolet to create our lexical closure or at least get the list so we can take multiple arguments
 (defmacro currym (fn . args)
   "Creates a partially applied function that takes 1 argument"
@@ -56,13 +57,25 @@
   (lambda (&rest args2) (apply fn (append args args2))))
 
 ;; can now take variables as input!! (let ((y 2)) (currys 2 + 1 2 3))
-(defmacro! currys (num fn . args)
+(defmacro currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  (if (integerp num)                    ; can't expand the environment optimally if a number isn't directly passed
+  (if (integerp num) ; can't expand the environment optimally if a number isn't directly passed
       (if (functionp (macro-function fn))
-          `(currym ,@(gensymbol-list (- num 1) 'currym) ,fn ,@args)
-          `(curryf ,@(gensymbol-list (- num 1) #'curryf) #',fn ,@args))
-      `(apply #'curryf (append (gensymbol-list (1- ,num) #'curryf) (list  (curry ,fn ,@args))))))
+          `(currym ,@(gensymbol-list (1- num) 'currym) ,fn ,@args)
+          `(curryf ,@(gensymbol-list (1- num) #'curryf) #',fn ,@args))
+      `(apply #'curryf (nconc (gensymbol-list (1- ,num) #'curryf)
+                              (list  (curry ,fn ,@args))))))
+
+(declaim (ftype (function ((integer 0) function &rest t) function) curryf-num))
+(defun curryf-num (num fn &rest args)
+  (lambda (&rest args2)
+    (let ((left (- num (length args2))))
+      (declare (type Integer left))
+      (if (> left 0)
+          (curryf-num left
+                      (apply (curryf #'curryf fn)
+                             (append args args2)))
+          (apply fn (append args args2))))))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
@@ -133,9 +146,9 @@
   "The monoid for Strings "
   `(concatenate 'string ,@str))
 
-;; (defun <>! (&rest lis)
-;;   "The monoid for lists"
-;;   (apply #'append l is))
+(defun <>! (&rest lis)
+  "The monoid for lists"
+  (apply #'append lis))
 
 (defmacro <>!! (&body vec)
   "The monoid for Vectors "
@@ -174,7 +187,7 @@
    (mapcar (curry expt 2) '(1 2 3 4))
    (funcall (compose #'list #'apply) #'+ '(1 2 3 4))
    (funcall (funcall (apply #'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
-   (curryl 2 (+ 1 2 3) (- 2 3 4))
+   ;; (curryl 2 (+ 1 2 3) (- 2 3 4))
    ))
 
 ;;; Lists--------------------------------------------------------
