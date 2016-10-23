@@ -70,7 +70,7 @@
   "contentiously curries a function until the num has been surpassed"
   (lambda (&rest args2)
     (let ((left (- num (length args2))))
-      (declare (type Integer left))
+      (declare (type integer left))
       (if (> left 0)
           (curryf-num left
                       (apply (curryf #'curryf fn)
@@ -81,7 +81,11 @@
 ;; arglist is also very slow (8k processor cycles!!!) so make sure to optimize this away by having it only expand in a macro!!
 (defun num-args (fn)
   "Gets the number of args in a function"
-  (length (arglist fn)))
+  (let* ((args (arglist fn))
+         (len (length args)))
+    (if (and  (< 2 len) (member '&rest args))
+        (- len 2)
+        len)))
 
 (defun auto-curryf (fn &rest args)
   (apply #'curryf-num (list* (num-args fn) fn args)))
