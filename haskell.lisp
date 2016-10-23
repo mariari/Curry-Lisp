@@ -63,7 +63,7 @@
           `(currym ,@(gensymbol-list (1- num) 'currym) ,fn ,@args)
           `(curryf ,@(gensymbol-list (1- num) #'curryf) #',fn ,@args))
       `(apply #'curryf (nconc (gensymbol-list (1- ,num) #'curryf)
-                              (list  (curry ,fn ,@args))))))
+                              (list (curry ,fn ,@args))))))
 
 (declaim (ftype (function ((integer 0) function &rest t) function) curryf-num))
 (defun curryf-num (num fn &rest args)
@@ -83,7 +83,7 @@
   "Gets the number of args in a function"
   (let* ((args (arglist fn))
          (len (length args)))
-    (if (and  (< 2 len) (member '&rest args))
+    (if (and (< 2 len) (member '&rest args))
         (- len 2)
         len)))
 
@@ -94,7 +94,7 @@
 (defmacro auto-curry (fn &rest args)
   (if (null args)
       `(curryf-num ,(num-args fn) #',fn)
-      `(curryf-num ,(num-args fn) #',fn ,args)))
+      `(curryf-num ,(num-args fn) #',fn ,@args)))
 
 (defmacro curryl (&rest fn-list)
     "curries a list by default 1... if you supply a number as the
