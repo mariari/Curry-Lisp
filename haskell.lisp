@@ -69,13 +69,13 @@
 (defun curryf-num (num fn &rest args)
   "contentiously curries a function until the num has been surpassed"
   (lambda (&rest args2)
-    (let ((left (- num (length args2))))
+    (let ((left (- num (length args2)))
+          (args-comb (append args args2)))
       (declare (type integer left))
       (if (> left 0)
           (curryf-num left
-                      (apply (curryf #'curryf fn)
-                             (append args args2)))
-          (apply fn (append args args2))))))
+                      (apply (curryf #'curryf fn) args-comb))
+          (apply fn args-comb)))))
 
 ;;  Will correctly display the right amount for &rest but not for &optional and &keyword yet
 ;; arglist is also very slow (8k processor cycles!!!) so make sure to optimize this away by having it only expand in a macro!!
@@ -97,12 +97,14 @@
       `(curryf-num ,(num-args fn) #',fn ,@args)))
 
 (defmacro curryl (&rest fn-list)
-    "curries a list by default 1... if you supply a number as the
+  "curries a list by default 1... if you supply a number as the
      first argument it will curry the entire list by that amount"
-  (if (numberp (car fn-list))
-      (let ((g (car fn-list)))
-        `(list ,@(mapcar (lambda (x) `(currys ,g ,@x)) (cdr fn-list))))
-      `(list ,@(mapcar (lambda (x) `(curry ,@x)) fn-list))))
+  (flet ((struct (lambda list)
+           `(list ,@(mapcar lambda list))))
+    (let ((1st (car fn-list)))
+      (if (numberp 1st)
+          (struct (lambda (x) `(currys ,1st ,@x)) (cdr fn-list))
+          (struct (lambda (x) `(curry ,@x)) fn-list)))))
 
 ;; From Practical Common Lisp
 (defun compose (&rest fns)
