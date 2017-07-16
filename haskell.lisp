@@ -158,7 +158,7 @@
                       (curryl ,@(cdr fns)))))
 
 (defmacro comp (&rest fns)
-  `(∘-1 ,@fns))
+  `(∘ ,@fns))
 
 ;; Unfinished, and very hard to verify what the behavior should be
 ;; After all in (∘ f g), g can take 2 arguments, and f could take a function
