@@ -107,8 +107,16 @@
            `(list ,@(mapcar lambda list))))
     (let ((1st (car fn-list)))
       (if (numberp 1st)
-          (struct (lambda (x) `(currys ,1st ,@x)) (cdr fn-list))
-          (struct (lambda (x) `(curry ,@x)) fn-list)))))
+          (struct (lambda (x)
+                    (if (listp x)
+                        `(currys ,1st ,@x)
+                        `(currys ,1st ,x)))
+                  (cdr fn-list))
+          (struct (lambda (x)
+                    (if (listp x)
+                        `(curry ,@x)
+                        `(curry ,x)))
+                  fn-list)))))
 
 
 (defmacro auto-curryl-gen (function &rest fn-list)
@@ -149,6 +157,8 @@
 
 (defun comp-1-help (fns) (apply #'compose-1 fns))
 
+;; Note this is only temporary that we only curry the rest of the functions once
+;; as soon as the :b :a system gets up, we can curry everything normally
 (defmacro ∘ (&rest fns)
   "A version of compose that curries the entire argument list by 1
    then applies what's left to the last function in the list"
@@ -257,9 +267,10 @@
    ;; (flip (<*> (* 2)) 3 (-))
    (funcall (curry + 1 2 3) 3)
    (mapcar (curry expt 2) '(1 2 3 4))
-   (funcall (funcall (comp + (- 3)) 1) 2) ; = 4
-   (funcall (∘ + (- 3)) 1 2) ; = 4
-   (funcall (funcall (apply 'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
+   (funcall (funcall (comp + (- 3)) 1) 2)  ; = 4
+   (funcall (∘ + (- 3)) 1 2)            ; = 4
+   (funcall (comp mapcar (curry +) - ) 2 '(1 2 3))
+   ;; (funcall (funcall (apply 'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
    ;; (curryl 2 (+ 1 2 3) (- 2 3 4))
    ))
 ;;; Lists--------------------------------------------------------
