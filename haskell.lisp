@@ -1,9 +1,9 @@
 ;; This would be a lot more elegant if Common Lisp was a Lisp-1!!!
-
-(ql:quickload '(:fare-quasiquote-readtable
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (ql:quickload '(:fare-quasiquote-readtable
                 :trivia
                 :swank
-                :let-over-lambda))
+                :let-over-lambda)))
 
 (defpackage #:haskell-lisp
   (:nicknames hl)
@@ -58,24 +58,27 @@
 ;; can now take variables as input!! (let ((y 2)) (currys 2 + 1 2 3))
 (defmacro currys (num fn . args)
   "Creates a partially applied function that takes 1 argument"
-  (if (integerp num)                    ; can't expand the environment optimally if a number isn't directly passed
+  (if (integerp num)                   ; can't expand the environment optimally if a number isn't directly passed
       (if (functionp (macro-function fn))
           `(currym ,@(gensymbol-list (1- num) 'currym) ,fn ,@args)
           `(curryf ,@(gensymbol-list (1- num) #'curryf) #',fn ,@args))
       `(apply #'curryf (nconc (gensymbol-list (1- ,num) #'curryf)
                               (list (curry ,fn ,@args))))))
 
-(declaim (ftype (function ((integer 0) function &rest t) function) curryf-num))
-(defun curryf-num (num fn &rest args)
-  "contentiously curries a function until the num has been surpassed"
-  (lambda (&rest args2)
-    (let ((left (- num (length args2)))
-          (args-comb (append args args2)))
-      (declare (type integer left))
-      (if (> left 0)
-          (curryf-num left
-                      (apply (curryf #'curryf fn) args-comb))
-          (apply fn args-comb)))))
+(locally (declare (optimize (speed 3) (debug 0) (compilation-speed 0)))
+  (declaim (ftype (function (fixnum function &rest t) function) curryf-num)
+           (notinline curryf-num))
+  (defun curryf-num (num fn &rest args)
+    "contentiously curries a function until the num has been surpassed"
+    (lambda (&rest args2)
+      (let ((left (- num (length args2)))
+            (args-comb (append args args2)))
+        (declare (type fixnum left)
+                 (type list args-comb))
+        (if (> left 0)
+            (curryf-num left
+                        (apply (curryf #'curryf fn) args-comb))
+            (apply fn args-comb))))))
 
 ;;  Will correctly display the right amount for &rest but not for &optional and &keyword yet
 ;; arglist is also very slow (8k processor cycles!!!) so make sure to optimize this away by having it only expand in a macro!!
@@ -106,18 +109,68 @@
           (struct (lambda (x) `(currys ,1st ,@x)) (cdr fn-list))
           (struct (lambda (x) `(curry ,@x)) fn-list)))))
 
-;; From Practical Common Lisp
-(defun compose (&rest fns)
-  "Returns a function like F(G(x)).... the functions,
-   when applied happen in reverse order of how they were inputted"
+
+(defmacro auto-curryl-gen (function &rest fn-list)
+  "generator function for auto-curryl and auto-currylf"
+  `(list ,@(mapcar (lambda (x)
+                     `(if (listp ',x)
+                          (,function ,@x)
+                          (,function ,x)))
+                   fn-list)))
+
+(defmacro auto-curryl (&rest fn-list)
+  "automatically curries a list"
+  `(auto-curryl-gen auto-curry ,@fn-list))
+
+(defmacro auto-currylf (&rest fn-list)
+  "automatically curries a list with the function alternative for auto-curry"
+  `(auto-curryl-gen auto-curryf ,@fn-list))
+
+
+(defun compose-1 (&rest fns)
+  "Very much like compose, except that it only applies the first args
+   to the far right function instead of all args, the rest of the args
+   gets sent to the first function in the list (car position)"
   (if fns
-      (let ((fn1 (car (last fns)))
-            (fns (butlast fns)))
-        (lambda (&rest args)
-          (reduce #'funcall fns
-                  :from-end t
-                  :initial-value (apply fn1 args))))
+      (let* ((fns (reverse fns)))
+        (alambda (&rest args)
+          (if args                        ; checks if any arguments were given
+              (funcall (alambda (fns arg) ; do the function if args are given
+                         (if (cdr fns)
+                             (self (cdr fns)
+                                   (funcall (car fns) arg))
+                             (apply (car fns)
+                                    (cons arg (cdr args)))))
+                       fns (car args))
+              (curry self))))           ; else just wait for proper inputs
       #'identity))
+
+(defun comp-1-help (fns) (apply #'compose-1 fns))
+
+(defun comp-help (fns) (apply #'compose fns))
+
+(defmacro ∘ (&rest fns)
+  "A version of compose that curries the entire argument list by 1
+   then applies what's left to the last function in the list"
+  `(comp-1-help (cons (if (listp ',(car fns))
+                          (auto-curry ,@(car fns))
+                          (auto-curry ,(car fns)))
+                      (curryl ,@(cdr fns)))))
+
+(defmacro comp (&rest fns)
+  `(∘-1 ,@fns))
+
+;; Unfinished, and very hard to verify what the behavior should be
+;; After all in (∘ f g), g can take 2 arguments, and f could take a function
+;; do we keep applying g?, no!, but that's the only way I think this could work!
+;; (defmacro ∘% (&rest fns)
+;;     "Compose that applies all the arguments as soon as it can"
+;;     `(comp-help (auto-curryl ,@fns)))
+
+;; (defmacro auto-comp% (&rest fns)
+;;   "Compose that applies all the arguments as soon as it can"
+;;   `(comp-help (auto-curryl ,@fns)))
+
 
 ;; Read/Partially Applied Functions------------------------------------------------------------
 (defmacro <*> (fn-1 fn-2 arg)
@@ -142,13 +195,7 @@
 ;; call wtih (<*>! (list (curry + 2) (curry - 3)) '(1 2 3 ))
 (defun <*>! (lis-fn lis)
   "The applicative for lists "
-  (>>=! lis-fn
-        (lambda (fn) (mapcar (lambda (x) (funcall fn x))
-                        lis))))
-
-(defmacro fun-append (fn num)
-  `(progn (princ ,fn) (,@fn ,num)))
-
+  (>>=! lis-fn (lambda (fn) (mapcar fn lis))))
 
 (defun =<<! (fn lis)
   "The Reverse Bind Monad for Lists "
@@ -159,7 +206,6 @@
   (mapcan fn lis))
 
 ;; Rerwrite with fast-apply later
-
 
 ;; The Monoid ---------------------------------------------------------------------------------
 
@@ -194,6 +240,9 @@
 (defmacro map-fn-print (&rest fns)
   `(list ,@(mapcar (lambda (x) `(fn-print ,x)) fns)))
 
+(defmacro alias (new current)
+  `(setf (fdefinition ',new) #',current))
+
 
 ;;; Fun Testing--------------------------------------------------------------------------------
 ;;; General functions--------------------------------------------
@@ -206,8 +255,8 @@
    ;; (flip (<*> (* 2)) 3 (-))
    (funcall (curry + 1 2 3) 3)
    (mapcar (curry expt 2) '(1 2 3 4))
-   (funcall (compose #'list #'apply) #'+ '(1 2 3 4))
-   (funcall (funcall (apply #'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
+   (funcall (compose 'list 'apply) '+ '(1 2 3 4))
+   (funcall (funcall (apply 'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
    ;; (curryl 2 (+ 1 2 3) (- 2 3 4))
    ))
 
