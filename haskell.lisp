@@ -147,8 +147,6 @@
 
 (defun comp-1-help (fns) (apply #'compose-1 fns))
 
-(defun comp-help (fns) (apply #'compose fns))
-
 (defmacro ∘ (&rest fns)
   "A version of compose that curries the entire argument list by 1
    then applies what's left to the last function in the list"
