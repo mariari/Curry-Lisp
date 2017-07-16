@@ -162,7 +162,6 @@
   `(∘ ,@fns))
 
 
-(funcall (funcall (comp + (- 3)) 1) 2)
 ;; Unfinished, and very hard to verify what the behavior should be
 ;; After all in (∘ f g), g can take 2 arguments, and f could take a function
 ;; do we keep applying g?, no!, but that's the only way I think this could work!
@@ -258,6 +257,8 @@
    ;; (flip (<*> (* 2)) 3 (-))
    (funcall (curry + 1 2 3) 3)
    (mapcar (curry expt 2) '(1 2 3 4))
+   (funcall (funcall (comp + (- 3)) 1) 2) ; = 4
+   (funcall (∘ + (- 3)) 1 2) ; = 4
    (funcall (funcall (apply 'compose (curryl (curry + 1 2 3) (- 2 3))) 3) 2)
    ;; (curryl 2 (+ 1 2 3) (- 2 3 4))
    ))
