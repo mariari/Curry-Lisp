@@ -1,9 +1,9 @@
 ;; This would be a lot more elegant if Common Lisp was a Lisp-1!!!
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (ql:quickload '(:fare-quasiquote-readtable
-                :trivia
-                :swank
-                :let-over-lambda)))
+                  :trivia
+                  :swank
+                  :let-over-lambda)))
 
 (defpackage #:haskell-lisp
   (:nicknames hl)
@@ -122,9 +122,9 @@
 (defmacro auto-curryl-gen (function &rest fn-list)
   "generator function for auto-curryl and auto-currylf"
   `(list ,@(mapcar (lambda (x)
-                     `(if (listp ',x)
-                          (,function ,@x)
-                          (,function ,x)))
+                     (if (listp x)
+                         `(,function ,@x)
+                         `(,function ,x)))
                    fn-list)))
 
 (defmacro auto-curryl (&rest fn-list)
@@ -145,15 +145,12 @@
         (alambda (&rest args)
           (if args                        ; checks if any arguments were given
               (funcall (alambda (fns arg) ; do the function if args are given
-                         (if (cdr fns)
-                             (self (cdr fns)
-                                   (funcall (car fns) arg))
-                             (apply (car fns)
-                                    (cons arg (cdr args)))))
+                         (match fns
+                           ((list f)     (apply f (cons arg (cdr args))))
+                           ((list* f fs) (self fs (funcall f arg)))))
                        fns (car args))
               (curry self))))             ; else just wait for proper inputs
       #'identity))
-
 
 (defun comp-1-help (fns) (apply #'compose-1 fns))
 
@@ -166,7 +163,6 @@
                            `(auto-curry ,@(car fns))
                            `(auto-curry ,(car fns)))
                       (curryl ,@(cdr fns)))))
-
 
 (defmacro comp (&rest fns)
   `(∘ ,@fns))
@@ -297,6 +293,7 @@
 
 ;; Add syntax for auto currying based on a default
 
+;; use ?a or c:a instead of :a
 ;; ([+ 1 2 3 :apply 2] 2)
 ;; ([+ 1 2 3 :a 2] 2)
 ;; ([+ 1 2 3 :flip-apply 2] 2)
